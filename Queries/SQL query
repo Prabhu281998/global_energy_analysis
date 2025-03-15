@@ -1,0 +1,169 @@
+SELECT * FROM portfolio_projects.global_energy_consumption;
+
+/* Counting Records from */
+
+SELECT Count(*) FROM portfolio_projects.global_energy_consumption; 
+
+/* Data Cleaning */
+
+/* Checking missing Null Values */
+SELECT 
+    SUM(CASE WHEN `Total Energy Consumption (TWh)` IS NULL THEN 1 ELSE 0 END) AS missing_energy,
+    SUM(CASE WHEN `Per Capita Energy Use (kWh)` IS NULL THEN 1 ELSE 0 END) AS missing_per_capita,
+    SUM(CASE WHEN `Renewable Energy Share (%)` IS NULL THEN 1 ELSE 0 END) AS missing_renewable,
+    SUM(CASE WHEN `Fossil Fuel Dependency (%)` IS NULL THEN 1 ELSE 0 END) AS missing_fossil_fuel,
+    SUM(CASE WHEN `Industrial Energy Use (%)` IS NULL THEN 1 ELSE 0 END) AS missing_industrial,
+    SUM(CASE WHEN `Household Energy Use (%)` IS NULL THEN 1 ELSE 0 END) AS missing_household,
+    SUM(CASE WHEN `Carbon Emissions (Million Tons)` IS NULL THEN 1 ELSE 0 END) AS missing_emissions,
+    SUM(CASE WHEN `Energy Price Index (USD/kWh)` IS NULL THEN 1 ELSE 0 END) AS missing_price
+FROM portfolio_projects.global_energy_consumption;
+
+/* Checking duplicate Values */
+
+SELECT Country, Year, 
+       `Total Energy Consumption (TWh)`, 
+       `Per Capita Energy Use (kWh)`, 
+       `Renewable Energy Share (%)`, 
+       `Fossil Fuel Dependency (%)`, 
+       `Industrial Energy Use (%)`, 
+       `Household Energy Use (%)`, 
+       `Carbon Emissions (Million Tons)`, 
+       `Energy Price Index (USD/kWh)`, 
+       COUNT(*) AS duplicate_count
+FROM portfolio_projects.global_energy_consumption
+GROUP BY Country, Year, 
+         `Total Energy Consumption (TWh)`, 
+         `Per Capita Energy Use (kWh)`, 
+         `Renewable Energy Share (%)`, 
+         `Fossil Fuel Dependency (%)`, 
+         `Industrial Energy Use (%)`, 
+         `Household Energy Use (%)`, 
+         `Carbon Emissions (Million Tons)`, 
+         `Energy Price Index (USD/kWh)`
+HAVING COUNT(*) > 1;
+
+
+/* Consolidating a data for better data analysis */
+SELECT 
+    Country, 
+    Year, 
+    SUM(`Total Energy Consumption (TWh)`) AS Total_Energy_Consumption, 
+    SUM(`Carbon Emissions (Million Tons)`) AS Total_Carbon_Emissions, 
+    AVG(`Renewable Energy Share (%)`) AS Avg_Renewable_Energy_Share, 
+    AVG(`Fossil Fuel Dependency (%)`) AS Avg_Fossil_Fuel_Dependency, 
+    AVG(`Industrial Energy Use (%)`) AS Avg_Industrial_Energy_Use, 
+    AVG(`Household Energy Use (%)`) AS Avg_Household_Energy_Use, 
+    SUM(`Per Capita Energy Use (kWh)`) / COUNT(*) AS Weighted_Per_Capita_Energy_Use,
+    SUM(`Energy Price Index (USD/kWh)`) / COUNT(*) AS Weighted_Energy_Price_Index
+FROM portfolio_projects.global_energy_consumption
+GROUP BY Country, Year
+ORDER BY Country, Year;
+
+/* Creating a new table for consolidated Data */
+CREATE TABLE portfolio_projects.aggregated_energy_consumption AS  
+SELECT 
+    Country, 
+    Year, 
+    SUM(`Total Energy Consumption (TWh)`) AS Total_Energy_Consumption, 
+    SUM(`Carbon Emissions (Million Tons)`) AS Total_Carbon_Emissions, 
+    AVG(`Renewable Energy Share (%)`) AS Avg_Renewable_Energy_Share, 
+    AVG(`Fossil Fuel Dependency (%)`) AS Avg_Fossil_Fuel_Dependency, 
+    AVG(`Industrial Energy Use (%)`) AS Avg_Industrial_Energy_Use, 
+    AVG(`Household Energy Use (%)`) AS Avg_Household_Energy_Use, 
+    SUM(`Per Capita Energy Use (kWh)`) / COUNT(*) AS Weighted_Per_Capita_Energy_Use,
+    SUM(`Energy Price Index (USD/kWh)`) / COUNT(*) AS Weighted_Energy_Price_Index
+FROM portfolio_projects.global_energy_consumption
+GROUP BY Country, Year
+ORDER BY Country, Year;
+
+SELECT * FROM portfolio_projects.aggregated_energy_consumption LIMIT 10;
+
+/* Global Trends */
+/* What is the total energy consumption trend over the years? */
+
+SELECT 
+    Year, 
+    SUM(Total_Energy_Consumption) AS Global_Total_Energy_Consumption
+FROM portfolio_projects.aggregated_energy_consumption
+GROUP BY Year
+ORDER BY Year;
+	
+/* Observations from the Data:
+Fluctuating Trend:
+
+Energy consumption increased from 2000 to 2007, reaching a peak in 2007 (2,164,026 TWh).
+It dropped in 2010 (1,694,138 TWh), likely due to economic downturns (e.g., the 2008 global financial crisis).
+Consumption recovered after 2010, peaking again in 2014 (2,247,936 TWh).
+Recent Decline (2020-2024):
+
+2020 (COVID-19 pandemic) saw the highest consumption (2,258,586 TWh)—possibly due to increased energy use in homes.
+A steady decline is observed after 2021, reaching 1,888,162 TWh in 2024.
+This could indicate higher efficiency, renewable energy adoption, or economic slowdowns.
+*/
+
+/* Which 5 countries consume the most energy in the latest available year? */
+SELECT 
+    Country, 
+    Total_Energy_Consumption 
+FROM portfolio_projects.aggregated_energy_consumption
+WHERE Year = (SELECT MAX(Year) FROM aggregated_energy_consumption)  -- Latest Year (2024)
+ORDER BY Total_Energy_Consumption DESC
+LIMIT 5;
+
+/* UK (238,140 TWh) leads in total energy consumption, which might be due to high industrial and commercial energy usage.
+Australia (227,091 TWh) follows, likely due to mining, heavy industries, and extreme climate conditions requiring high energy usage.
+Russia (215,712 TWh) has high consumption, likely due to its large industrial sector, energy exports, and cold climate.
+Canada (211,405 TWh) is another high consumer, with large industrial sectors (oil, gas, and manufacturing) and heating demands.
+China (202,998 TWh) appears in the top 5, despite being a global manufacturing hub. This could be due to energy efficiency improvements and renewable energy adoption.
+*/
+
+/*Which year recorded the highest energy consumption globally? */
+SELECT Year, SUM(Total_Energy_Consumption) AS Global_Energy_Consumption
+FROM portfolio_projects.aggregated_energy_consumption
+GROUP BY Year
+ORDER BY Global_Energy_Consumption DESC
+LIMIT 1;
+
+/* 2020 recorded the highest global energy consumption: 2,258,586.61 TWh.
+
+Possible Reasons for Peak in 2020:
+🔹 Increased Residential Energy Use: More people worked from home due to COVID-19 lockdowns.
+🔹 Industrial Operations Adjustments: Some industries ramped up production, while others remained operational at reduced efficiency.
+🔹 Higher Digital Energy Demand: More internet usage, cloud computing, and streaming services surged energy consumption.
+*/
+
+/* Which country had the highest per capita energy consumption in the latest year? */
+
+SELECT Country,  Weighted_Per_Capita_Energy_Use
+FROM portfolio_projects.aggregated_energy_consumption
+WHERE Year = (SELECT MAX(Year) FROM portfolio_projects.aggregated_energy_consumption)
+ORDER BY Weighted_Per_Capita_Energy_Use DESC
+LIMIT 1;
+
+/* 
+📌 Country: Brazil 🇧🇷
+📌 Per Capita Energy Use: 28,180.42 kWh
+
+Possible Reasons for Brazil's High Per Capita Energy Use in 2024:
+🔹 Industrial Growth: Brazil has a strong industrial sector, including manufacturing, mining, and agriculture processing.
+🔹 Hydropower Dominance: A large share of Brazil’s energy comes from hydroelectric power, making energy more accessible.
+🔹 Population vs. Energy Ratio: With a relatively stable population and increasing energy demand, the per capita figure rises.
+🔹 Urbanization & Infrastructure Growth: More cities expanding, leading to higher residential and commercial energy use.
+
+*/
+
+/* What is the trend of renewable energy adoption globally? */
+
+SELECT Year, AVG(Avg_Renewable_Energy_Share) AS Avg_Renewable_Energy_Share
+FROM portfolio_projects.aggregated_energy_consumption
+group by Year
+ORDER BY Year;
+
+/*
+Renewable energy share fluctuated over the years, with periods of increase and decline.
+The highest recorded share was 49.38% in 2010, followed by 49.33% in 2022.
+The lowest was 45.21% in 2014, indicating a temporary decline.
+In 2024, the share is at 48.48%, suggesting a stable upward trend. */
+
+
+
